@@ -1,7 +1,13 @@
-.env
-.venv/
-.vscode/
+# Python
 __pycache__/
-.DS_Store/
-.ruff_cache/
-config.py
+*.pyc
+
+# Виртуальное окружение
+.venv/
+
+# Логи и данные
+bot_log.txt
+user_data.json
+
+# Секреты
+.env
