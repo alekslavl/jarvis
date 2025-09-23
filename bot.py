@@ -12,12 +12,15 @@ from telegram.ext import (
     CallbackQueryHandler,
     filters,
 )
+from openai import OpenAI
 
 # --- Загружаем токены ---
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 EXCHANGE_API_KEY = os.getenv("EXCHANGE_API_KEY")
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 DATA_FILE = "data.json"
 LOG_FILE = "bot_log.txt"
@@ -184,6 +187,29 @@ async def list_voices(update: Update, context: ContextTypes.DEFAULT_TYPE):
         path = os.path.join(user_dir, f)
         await update.message.reply_voice(voice=InputFile(path))
 
+# --- Команда /ask ---
+async def ask_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("⚠️ Используй команду так: /ask <твой вопрос>")
+        return
+
+    question = " ".join(context.args)
+    await update.message.reply_text("🤖 Думаю...")
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "Ты — Джарвис, умный ассистент как у Тони Старка."},
+                {"role": "user", "content": question},
+            ],
+        )
+        answer = response.choices[0].message.content
+        await update.message.reply_text(answer)
+    except Exception as e:
+        print("Ошибка OpenAI:", e)
+        await update.message.reply_text("⚠️ Не удалось получить ответ от ИИ.")
+
 # --- Обработка сообщений ---
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
@@ -295,6 +321,7 @@ def main():
     app.add_handler(CommandHandler("list", list_notes))
     app.add_handler(CommandHandler("del", del_note))
     app.add_handler(CommandHandler("voices", list_voices))
+    app.add_handler(CommandHandler("ask", ask_ai))
 
     # Обработка кнопок меню
     app.add_handler(CallbackQueryHandler(button))
