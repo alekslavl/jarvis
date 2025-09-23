@@ -215,7 +215,8 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     data = load_data()
     menu_state = data.get(user_id, {}).get("menu", "main")
-    log(user_id, "Написал сообщение", update.message.text if update.message.text else "[non-text]")
+    text = update.message.text.strip() if update.message.text else ""
+    log(user_id, "Написал сообщение", text if text else "[non-text]")
 
     # --- Голосовые сообщения ---
     if update.message.voice:
@@ -234,9 +235,28 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         log(user_id, "Сохранил голосовое сообщение", file_path)
         return
 
-    # --- Конвертация валют ---
+    # --- Проверка на ИИ (триггер-слово "джарвис") ---
+    if text.lower().startswith("джарвис"):
+        question = text[len("джарвис"):].strip()
+        await update.message.reply_text("🤖 Джарвис думает...")
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "Ты — Джарвис, умный ассистент как у Тони Старка."},
+                    {"role": "user", "content": question},
+                ],
+            )
+            answer = response.choices[0].message.content
+            await update.message.reply_text(answer)
+        except Exception as e:
+            print("Ошибка OpenAI:", e)
+            await update.message.reply_text("⚠️ Не удалось получить ответ от Джарвиса.")
+        return
+
+    # --- Конвертер валют ---
     if menu_state == "convert":
-        parts = update.message.text.strip().split()
+        parts = text.split()
         if len(parts) != 3:
             await update.message.reply_text("⚠️ Формат: `<сумма> <из валюты> <в валюту>`", reply_markup=ReplyKeyboardRemove())
             return
@@ -260,7 +280,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # --- Погода ---
     if menu_state == "weather":
-        city = update.message.text.strip()
+        city = text
         weather_info = get_weather(city)
         if weather_info:
             await update.message.reply_text(weather_info, reply_markup=ReplyKeyboardRemove())
@@ -270,17 +290,30 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # --- Заметки ---
     if menu_state == "notes":
-        note_text = update.message.text.strip()
-        if note_text.startswith("/"):
+        if text.startswith("/"):
             return
-        data[user_id]["notes"].append(note_text)
+        data[user_id]["notes"].append(text)
         save_data(data)
-        await update.message.reply_text(f"✅ Заметка добавлена: {note_text}", reply_markup=ReplyKeyboardRemove())
+        await update.message.reply_text(f"✅ Заметка добавлена: {text}", reply_markup=ReplyKeyboardRemove())
         return
 
-    # --- Обычное сообщение ---
-    if update.message.text:
-        await update.message.reply_text(f"Ты в меню '{menu_state}'. Ты написал: {update.message.text}", reply_markup=ReplyKeyboardRemove())
+    # --- Авто-Джарвис: любое другое сообщение ---
+    if text:
+        question = text
+        await update.message.reply_text("🤖 Джарвис думает...")
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "Ты — Джарвис, умный ассистент как у Тони Старка."},
+                    {"role": "user", "content": question},
+                ],
+            )
+            answer = response.choices[0].message.content
+            await update.message.reply_text(answer)
+        except Exception as e:
+            print("Ошибка OpenAI:", e)
+            await update.message.reply_text("⚠️ Не удалось получить ответ от Джарвиса.")
 
 # --- Кнопки меню ---
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
